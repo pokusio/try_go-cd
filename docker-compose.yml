@@ -1,0 +1,56 @@
+version: "3"
+services:
+  server:
+    image: gocd/gocd-server:v22.3.0
+    # image: gocd/gocd-server:v19.1.0
+    user: root
+    ports:
+      - "8153:8153"
+      - "8154:8154"
+
+    volumes:
+      - ./data:/godata
+      # - ./data/home:/home/go
+      - ./scripts/server:/docker-entrypoint.d
+      - ./scripts/shared:/shared
+
+    environment:
+      # - UID=1000
+      # - GID=1000
+      - GO_SERVER_SYSTEM_PROPERTIES=-Dcruise.material.update.interval=2000 -Dmaterial.update.idle.interval=2000
+
+    depends_on:
+      - "gitserver"
+
+  agent:
+    # ---
+    # https://hub.docker.com/r/gocd/gocd-agent-docker-dind
+    image: gocd/gocd-agent-docker-dind:v22.3.0
+    privileged: true
+    # image: gocd/gocd-agent-alpine-3.8:v19.1.0
+
+    environment:
+      - GO_SERVER_URL=https://server:8154/go
+      - AGENT_AUTO_REGISTER_KEY=agent-autoregister-key
+
+    volumes:
+      - ./scripts/agent:/docker-entrypoint.d
+      - ./scripts/shared:/shared
+      # - $PWD/.go.agent.workspace:/home/go
+
+    deploy:
+      replicas: 2
+
+    depends_on:
+      - "server"
+      - "gitserver"
+
+  gitserver:
+    image: gocdcontrib/git-http-backend:v2
+    # image: gocdcontrib/git-http-backend:v2
+
+    ports:
+      - "8155:80"
+
+    volumes:
+      - ./repositories:/git
